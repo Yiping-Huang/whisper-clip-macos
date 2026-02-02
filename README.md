@@ -20,6 +20,32 @@ Whisper Clip is a local speech-to-text menu bar app for macOS.
 - `scripts/setup_macos_backend.sh`: create venv and install Python deps
 - `scripts/run_macos_menu_bar.sh`: run the Swift app in dev mode
 
+## Smart refine modes
+
+The menu now includes:
+- `Smart refine (LLM)` toggle
+- `Smart mode` picker with:
+  - `Normal` (keeps the current transcription-only workflow)
+  - `Email Dictation` (uses email polishing prompt template)
+  - `Work Chat` (uses Slack/Teams-style polishing prompt template)
+
+For `Email Dictation` and `Work Chat`, the backend can call your own LLM hook after transcription.
+
+Implement your API integration in:
+
+- `backend/stt_backend/user_llm_bridge.py`
+
+Required hook contract:
+
+```python
+def query_llm(user_query: str) -> str:
+    ...
+```
+
+Prompt templates are in:
+
+- `backend/stt_backend/prompt_templates.py`
+
 ## STT/audio stack
 
 - Whisper inference: `openai-whisper`

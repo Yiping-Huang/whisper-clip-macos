@@ -7,7 +7,9 @@ from pathlib import Path
 from .config import DEFAULT_LANGUAGE, DEFAULT_MODEL, DEFAULT_SAMPLE_RATE, default_config
 from .json_io import emit
 from .logging_utils import get_logger
+from .prompt_templates import SMART_MODES, SMART_MODE_NORMAL
 from .recorder import capture_loop, start_recording, stop_recording
+from .smart_workflow import refine_transcript
 from .transcriber import ensure_model_available, model_is_available_locally, transcribe_file
 
 
@@ -24,6 +26,8 @@ def _build_parser() -> argparse.ArgumentParser:
     record_parser.add_argument("--state-dir", type=Path)
     record_parser.add_argument("--model", default=DEFAULT_MODEL)
     record_parser.add_argument("--language", default=DEFAULT_LANGUAGE)
+    record_parser.add_argument("--smart-mode", default=SMART_MODE_NORMAL, choices=SMART_MODES)
+    record_parser.add_argument("--smart-refine-enabled", default="false", choices=["true", "false"])
 
     toggle_parser = subparsers.add_parser("run", help="toggle recording state")
     toggle_parser.add_argument("--mode", default="toggle", choices=["toggle"])
@@ -32,6 +36,8 @@ def _build_parser() -> argparse.ArgumentParser:
     toggle_parser.add_argument("--state-dir", type=Path)
     toggle_parser.add_argument("--model", default=DEFAULT_MODEL)
     toggle_parser.add_argument("--language", default=DEFAULT_LANGUAGE)
+    toggle_parser.add_argument("--smart-mode", default=SMART_MODE_NORMAL, choices=SMART_MODES)
+    toggle_parser.add_argument("--smart-refine-enabled", default="false", choices=["true", "false"])
 
     model_parser = subparsers.add_parser("model", help="model cache status/download")
     model_mode = model_parser.add_mutually_exclusive_group(required=True)
@@ -57,6 +63,10 @@ def _state_dir(cli_path: Path | None) -> Path:
     return cli_path or cfg.state_dir
 
 
+def _to_bool(value: str) -> bool:
+    return (value or "").strip().lower() == "true"
+
+
 def _handle_stop(args, logger):
     cfg = default_config()
     state_dir = _state_dir(args.state_dir)
@@ -75,17 +85,32 @@ def _handle_stop(args, logger):
         model_dir=cfg.model_dir,
         language=language,
     )
+    smart_mode = args.smart_mode or SMART_MODE_NORMAL
+    smart_refine_enabled = _to_bool(args.smart_refine_enabled)
+    refined_text, refined = refine_transcript(
+        transcript=text,
+        mode=smart_mode,
+        smart_refine_enabled=smart_refine_enabled,
+    )
     payload = {
         "status": "ok",
-        "text": text,
+        "text": refined_text,
         "latency_ms": latency_ms,
         "audio_path": str(audio_path),
         "model": model,
         "language": language,
         "model_downloaded": model_downloaded,
+        "workflow_mode": smart_mode,
+        "refined": refined,
     }
     emit(payload)
-    logger.info("Transcribed audio_path=%s latency_ms=%s", audio_path, latency_ms)
+    logger.info(
+        "Transcribed audio_path=%s latency_ms=%s smart_mode=%s refined=%s",
+        audio_path,
+        latency_ms,
+        smart_mode,
+        refined,
+    )
     return 0
 
 

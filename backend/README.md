@@ -24,6 +24,12 @@ Stop recording + transcribe:
 PYTHONPATH=backend python -m stt_backend record --stop --model small --language auto
 ```
 
+Stop recording + transcribe + smart refine:
+
+```bash
+PYTHONPATH=backend python -m stt_backend record --stop --model small --language auto --smart-mode email --smart-refine-enabled true
+```
+
 Toggle recording (single command mode):
 
 ```bash
@@ -43,6 +49,23 @@ Failure:
 ```json
 { "status": "error", "error": "..." }
 ```
+
+## Smart refine hook
+
+Implement your own LLM call in:
+
+- `backend/stt_backend/user_llm_bridge.py`
+
+Function signature:
+
+```python
+def query_llm(user_query: str) -> str:
+    ...
+```
+
+Built-in prompt templates for `email` and `work_chat` are in:
+
+- `backend/stt_backend/prompt_templates.py`
 
 ## Logging
 

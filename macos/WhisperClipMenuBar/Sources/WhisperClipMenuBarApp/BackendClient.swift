@@ -4,6 +4,8 @@ struct TranscriptionResult {
     let text: String
     let latencyMS: Int
     let modelDownloaded: Bool
+    let refined: Bool
+    let workflowMode: SmartWorkflowMode
 }
 
 enum BackendError: LocalizedError {
@@ -46,12 +48,19 @@ final class BackendClient {
         return payload
     }
 
-    func recordStop(model: String, language: String) async throws -> TranscriptionResult {
+    func recordStop(
+        model: String,
+        language: String,
+        smartRefineEnabled: Bool,
+        smartWorkflowMode: SmartWorkflowMode
+    ) async throws -> TranscriptionResult {
         let payload = try await runBackend(args: [
             "record", "--stop",
             "--state-dir", stateDir.path,
             "--model", model,
             "--language", language,
+            "--smart-mode", smartWorkflowMode.rawValue,
+            "--smart-refine-enabled", smartRefineEnabled ? "true" : "false",
         ])
         if (payload["status"] as? String) != "ok" {
             throw BackendError.commandFailed(payload["error"] as? String ?? "record stop failed")
@@ -59,7 +68,16 @@ final class BackendClient {
         let text = payload["text"] as? String ?? ""
         let latency = payload["latency_ms"] as? Int ?? 0
         let modelDownloaded = payload["model_downloaded"] as? Bool ?? false
-        return TranscriptionResult(text: text, latencyMS: latency, modelDownloaded: modelDownloaded)
+        let refined = payload["refined"] as? Bool ?? false
+        let workflowModeRawValue = payload["workflow_mode"] as? String ?? SmartWorkflowMode.normal.rawValue
+        let workflowMode = SmartWorkflowMode(rawValue: workflowModeRawValue) ?? .normal
+        return TranscriptionResult(
+            text: text,
+            latencyMS: latency,
+            modelDownloaded: modelDownloaded,
+            refined: refined,
+            workflowMode: workflowMode
+        )
     }
 
     func isModelAvailableLocally(model: String) async throws -> Bool {

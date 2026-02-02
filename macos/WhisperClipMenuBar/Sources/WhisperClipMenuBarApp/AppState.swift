@@ -23,6 +23,8 @@ final class AppState: ObservableObject {
     @AppStorage("whisperLanguage") var whisperLanguage: String = "auto"
     @AppStorage("soundCuesEnabled") var soundCuesEnabled: Bool = true
     @AppStorage("transcribingLoopSoundEnabled") var transcribingLoopSoundEnabled: Bool = true
+    @AppStorage("smartRefineEnabled") var smartRefineEnabled: Bool = false
+    @AppStorage("smartWorkflowMode") private var smartWorkflowModeRawValue: String = SmartWorkflowMode.normal.rawValue
 
     // Carbon global hotkeys do not support Fn as a modifier, so we use Option+Z.
     private let hotKeyCode: UInt32 = UInt32(kVK_ANSI_Z)
@@ -67,6 +69,11 @@ final class AppState: ObservableObject {
 
     var hotKeyDisplayText: String {
         "Hotkey: Option + Z"
+    }
+
+    var smartWorkflowMode: SmartWorkflowMode {
+        get { SmartWorkflowMode(rawValue: smartWorkflowModeRawValue) ?? .normal }
+        set { smartWorkflowModeRawValue = newValue.rawValue }
     }
 
     func toggleRecording() {
@@ -156,6 +163,8 @@ final class AppState: ObservableObject {
         let model = whisperModel
         let language = whisperLanguage
         let autoPaste = autoPasteAfterTranscription
+        let smartRefineEnabled = self.smartRefineEnabled
+        let smartMode = self.smartWorkflowMode
 
         Task.detached { [weak self] in
             guard let self else { return }
@@ -184,7 +193,12 @@ final class AppState: ObservableObject {
                     self.startTranscribingLoopIfNeeded()
                 }
 
-                let result = try await self.backend.recordStop(model: model, language: language)
+                let result = try await self.backend.recordStop(
+                    model: model,
+                    language: language,
+                    smartRefineEnabled: smartRefineEnabled,
+                    smartWorkflowMode: smartMode
+                )
                 await MainActor.run {
                     self.stopTranscribingLoopIfNeeded()
                     self.lastTranscription = result.text

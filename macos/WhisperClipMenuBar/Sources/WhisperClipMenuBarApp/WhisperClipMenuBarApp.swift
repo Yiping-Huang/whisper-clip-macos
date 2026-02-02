@@ -25,6 +25,16 @@ struct WhisperClipMenuBarApp: App {
                 Toggle("Auto Paste after transcription", isOn: $appState.autoPasteAfterTranscription)
                 Toggle("Sound cues", isOn: $appState.soundCuesEnabled)
                 Toggle("Transcribing loop sound", isOn: $appState.transcribingLoopSoundEnabled)
+                Toggle("Smart refine (LLM)", isOn: $appState.smartRefineEnabled)
+                Picker("Smart mode", selection: Binding(
+                    get: { appState.smartWorkflowMode },
+                    set: { appState.smartWorkflowMode = $0 }
+                )) {
+                    ForEach(SmartWorkflowMode.allCases, id: \.rawValue) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .disabled(!appState.smartRefineEnabled)
 
                 Picker("Model", selection: $appState.whisperModel) {
                     Text("base").tag("base")
