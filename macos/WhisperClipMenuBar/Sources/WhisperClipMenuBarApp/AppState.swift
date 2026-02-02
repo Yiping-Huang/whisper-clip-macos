@@ -22,6 +22,7 @@ final class AppState: ObservableObject {
     @AppStorage("whisperModel") var whisperModel: String = "small"
     @AppStorage("whisperLanguage") var whisperLanguage: String = "auto"
     @AppStorage("soundCuesEnabled") var soundCuesEnabled: Bool = true
+    @AppStorage("transcribingLoopSoundEnabled") var transcribingLoopSoundEnabled: Bool = true
 
     // Carbon global hotkeys do not support Fn as a modifier, so we use Option+Z.
     private let hotKeyCode: UInt32 = UInt32(kVK_ANSI_Z)
@@ -83,6 +84,19 @@ final class AppState: ObservableObject {
         NSPasteboard.general.setString(lastTranscription, forType: .string)
         status = .copied
         statusText = "Copied ✅"
+    }
+
+    func refreshTranscribingLoopSound() {
+        guard status == .transcribing else {
+            stopTranscribingLoopIfNeeded()
+            return
+        }
+
+        if soundCuesEnabled && transcribingLoopSoundEnabled {
+            startTranscribingLoopIfNeeded()
+        } else {
+            stopTranscribingLoopIfNeeded()
+        }
     }
 
     private func startRecording() {
@@ -167,7 +181,7 @@ final class AppState: ObservableObject {
     }
 
     private func startTranscribingLoopIfNeeded() {
-        guard soundCuesEnabled else { return }
+        guard soundCuesEnabled && transcribingLoopSoundEnabled else { return }
         stopTranscribingLoopIfNeeded()
         guard let sound = NSSound(named: "Purr") else { return }
         sound.volume = 0.12

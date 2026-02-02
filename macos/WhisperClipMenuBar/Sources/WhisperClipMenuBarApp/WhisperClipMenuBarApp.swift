@@ -24,6 +24,7 @@ struct WhisperClipMenuBarApp: App {
 
                 Toggle("Auto Paste after transcription", isOn: $appState.autoPasteAfterTranscription)
                 Toggle("Sound cues", isOn: $appState.soundCuesEnabled)
+                Toggle("Transcribing loop sound", isOn: $appState.transcribingLoopSoundEnabled)
 
                 Picker("Model", selection: $appState.whisperModel) {
                     Text("base").tag("base")
@@ -64,6 +65,12 @@ struct WhisperClipMenuBarApp: App {
             }
             .padding(12)
             .frame(width: 300)
+            .onChange(of: appState.soundCuesEnabled) { _ in
+                appState.refreshTranscribingLoopSound()
+            }
+            .onChange(of: appState.transcribingLoopSoundEnabled) { _ in
+                appState.refreshTranscribingLoopSound()
+            }
         } label: {
             Image(systemName: appState.statusIconName)
                 .onAppear {
