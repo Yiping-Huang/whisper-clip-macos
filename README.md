@@ -5,6 +5,14 @@ Whisper Clip is a local speech-to-text menu bar app for macOS.
 - **Frontend**: SwiftUI menu bar app in `macos/WhisperClipMenuBar`
 - **Backend**: Python Whisper/audio CLI in `backend/stt_backend`
 
+## Prerequisites (macOS)
+
+- Xcode Command Line Tools (`xcode-select --install`)
+- Homebrew
+- Python 3.11 (`brew install python@3.11`)
+- FFmpeg for Whisper decoding (`brew install ffmpeg`)
+- PortAudio for microphone capture (`brew install portaudio`)
+
 ## Architecture
 
 - `macos/WhisperClipMenuBar`: menu bar UI, global hotkey, notifications, clipboard/auto-paste
@@ -39,19 +47,33 @@ Error JSON:
 
 ## Build & run (dev mode)
 
-1) Setup backend environment:
+1) Install system dependencies (once):
+
+```bash
+# Install Homebrew first if you don't have it: https://brew.sh
+brew install python@3.11 ffmpeg portaudio
+```
+
+2) Setup backend environment:
 
 ```bash
 ./scripts/setup_macos_backend.sh
 ```
 
-2) Run menu bar app:
+3) Run menu bar app:
 
 ```bash
 ./scripts/run_macos_menu_bar.sh
 ```
 
 Default hotkey: **Option + Z**.
+
+If you use Conda, make sure the app still points to repo venv Python:
+
+```bash
+echo $WHISPER_CLIP_PYTHON
+# expected: <repo>/.venv/bin/python3
+```
 
 ## Permissions (macOS)
 
