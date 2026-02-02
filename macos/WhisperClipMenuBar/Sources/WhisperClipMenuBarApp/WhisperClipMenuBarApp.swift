@@ -9,7 +9,10 @@ struct WhisperClipMenuBarApp: App {
         MenuBarExtra {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Status: \(appState.statusText)")
-                Text("Hotkey: Option + Command + S")
+                Text(appState.hotKeyDisplayText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(appState.notificationStatusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -61,11 +64,11 @@ struct WhisperClipMenuBarApp: App {
             }
             .padding(12)
             .frame(width: 300)
-            .onAppear {
-                appState.start()
-            }
         } label: {
             Image(systemName: appState.statusIconName)
+                .onAppear {
+                    appState.start()
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -81,6 +84,7 @@ struct WhisperClipMenuBarApp: App {
     private func showLastTranscriptionWindow(_ text: String) {
         guard !text.isEmpty else { return }
         let alert = NSAlert()
+        alert.icon = nil
         alert.messageText = "Last Transcription"
         alert.informativeText = text
         alert.addButton(withTitle: "OK")

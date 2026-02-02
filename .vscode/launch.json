@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:whisper-clip-macos}/macos/WhisperClipMenuBar",
+      "name": "Debug WhisperClipMenuBar (macos/WhisperClipMenuBar)",
+      "target": "WhisperClipMenuBar",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug WhisperClipMenuBar (macos/WhisperClipMenuBar)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:whisper-clip-macos}/macos/WhisperClipMenuBar",
+      "name": "Release WhisperClipMenuBar (macos/WhisperClipMenuBar)",
+      "target": "WhisperClipMenuBar",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release WhisperClipMenuBar (macos/WhisperClipMenuBar)"
+    }
+  ]
+}

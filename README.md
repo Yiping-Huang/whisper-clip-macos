@@ -51,7 +51,7 @@ Error JSON:
 ./scripts/run_macos_menu_bar.sh
 ```
 
-Default hotkey: **Option + Command + S**.
+Default hotkey: **Option + Z**.
 
 ## Permissions (macOS)
 
