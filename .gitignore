@@ -1,0 +1,9 @@
+.venv
+model
+.build
+.swift-cache
+.swift-home
+backend/logs/*.log
+backend/state
+__pycache__/
+*.pyc
