@@ -71,6 +71,9 @@ struct WhisperClipMenuBarApp: App {
             .onChange(of: appState.transcribingLoopSoundEnabled) { _ in
                 appState.refreshTranscribingLoopSound()
             }
+            .onChange(of: appState.whisperModel) { newModel in
+                appState.warmUpModelIfNeeded(newModel)
+            }
         } label: {
             Image(systemName: appState.statusIconName)
                 .onAppear {

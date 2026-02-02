@@ -3,6 +3,7 @@ import Foundation
 struct TranscriptionResult {
     let text: String
     let latencyMS: Int
+    let modelDownloaded: Bool
 }
 
 enum BackendError: LocalizedError {
@@ -57,7 +58,30 @@ final class BackendClient {
         }
         let text = payload["text"] as? String ?? ""
         let latency = payload["latency_ms"] as? Int ?? 0
-        return TranscriptionResult(text: text, latencyMS: latency)
+        let modelDownloaded = payload["model_downloaded"] as? Bool ?? false
+        return TranscriptionResult(text: text, latencyMS: latency, modelDownloaded: modelDownloaded)
+    }
+
+    func isModelAvailableLocally(model: String) async throws -> Bool {
+        let payload = try await runBackend(args: [
+            "model", "--status",
+            "--model", model,
+        ])
+        if (payload["status"] as? String) != "ok" {
+            throw BackendError.commandFailed(payload["error"] as? String ?? "model status failed")
+        }
+        return payload["is_available"] as? Bool ?? false
+    }
+
+    func ensureModelAvailable(model: String) async throws -> Bool {
+        let payload = try await runBackend(args: [
+            "model", "--ensure",
+            "--model", model,
+        ])
+        if (payload["status"] as? String) != "ok" {
+            throw BackendError.commandFailed(payload["error"] as? String ?? "model ensure failed")
+        }
+        return payload["downloaded"] as? Bool ?? false
     }
 
     private func runBackend(args: [String]) async throws -> [String: Any] {
@@ -76,16 +100,30 @@ final class BackendClient {
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        var streamedStderr = Data()
+        let stderrQueue = DispatchQueue(label: "whisperclip.backend.stderr")
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            guard !chunk.isEmpty else { return }
+            stderrQueue.sync {
+                streamedStderr.append(chunk)
+            }
+            FileHandle.standardError.write(chunk)
+        }
 
         try process.run()
         process.waitUntilExit()
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
 
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrDataTail = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        stderrQueue.sync {
+            streamedStderr.append(stderrDataTail)
+        }
         let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+        let stderr = String(data: streamedStderr, encoding: .utf8) ?? ""
 
         let lines = stdout
             .split(whereSeparator: \.isNewline)

@@ -8,7 +8,7 @@ from .config import DEFAULT_LANGUAGE, DEFAULT_MODEL, DEFAULT_SAMPLE_RATE, defaul
 from .json_io import emit
 from .logging_utils import get_logger
 from .recorder import capture_loop, start_recording, stop_recording
-from .transcriber import transcribe_file
+from .transcriber import ensure_model_available, model_is_available_locally, transcribe_file
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -32,6 +32,12 @@ def _build_parser() -> argparse.ArgumentParser:
     toggle_parser.add_argument("--state-dir", type=Path)
     toggle_parser.add_argument("--model", default=DEFAULT_MODEL)
     toggle_parser.add_argument("--language", default=DEFAULT_LANGUAGE)
+
+    model_parser = subparsers.add_parser("model", help="model cache status/download")
+    model_mode = model_parser.add_mutually_exclusive_group(required=True)
+    model_mode.add_argument("--status", action="store_true")
+    model_mode.add_argument("--ensure", action="store_true")
+    model_parser.add_argument("--model", default=DEFAULT_MODEL)
 
     capture_parser = subparsers.add_parser("_capture", help=argparse.SUPPRESS)
     capture_parser.add_argument("--audio-path", type=Path, required=True)
@@ -63,7 +69,7 @@ def _handle_stop(args, logger):
     language = _normalize_language(stop_result.get("language") or args.language)
     audio_path = Path(stop_result["audio_path"])
 
-    text, latency_ms = transcribe_file(
+    text, latency_ms, model_downloaded = transcribe_file(
         audio_path=audio_path,
         model_name=model,
         model_dir=cfg.model_dir,
@@ -76,6 +82,7 @@ def _handle_stop(args, logger):
         "audio_path": str(audio_path),
         "model": model,
         "language": language,
+        "model_downloaded": model_downloaded,
     }
     emit(payload)
     logger.info("Transcribed audio_path=%s latency_ms=%s", audio_path, latency_ms)
@@ -125,6 +132,31 @@ def main(argv: list[str] | None = None) -> int:
             )
             emit(payload)
             return 0 if payload.get("status") == "ok" else 1
+
+        if args.command == "model":
+            model = args.model
+            if args.status:
+                emit(
+                    {
+                        "status": "ok",
+                        "model": model,
+                        "is_available": model_is_available_locally(model_name=model, model_dir=cfg.model_dir),
+                        "model_dir": str(cfg.model_dir),
+                    }
+                )
+                return 0
+            if args.ensure:
+                downloaded = ensure_model_available(model_name=model, model_dir=cfg.model_dir)
+                emit(
+                    {
+                        "status": "ok",
+                        "model": model,
+                        "downloaded": downloaded,
+                        "is_available": True,
+                        "model_dir": str(cfg.model_dir),
+                    }
+                )
+                return 0
 
         emit({"status": "error", "error": "unsupported_command"})
         return 1

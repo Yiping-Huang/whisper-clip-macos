@@ -32,6 +32,7 @@ final class AppState: ObservableObject {
     private var hotKeyManager: GlobalHotKeyManager?
     private var didStart = false
     private var transcribingLoopSound: NSSound?
+    private var modelWarmupTask: Task<Void, Never>?
 
     func start() {
         guard !didStart else { return }
@@ -44,6 +45,7 @@ final class AppState: ObservableObject {
         }
         hotKeyManager?.register()
         NotificationClient.shared.requestAuthorization()
+        warmUpModelIfNeeded(whisperModel)
     }
 
     var statusIconName: String {
@@ -99,6 +101,34 @@ final class AppState: ObservableObject {
         }
     }
 
+    func warmUpModelIfNeeded(_ model: String) {
+        modelWarmupTask?.cancel()
+        modelWarmupTask = Task.detached { [weak self] in
+            guard let self else { return }
+            do {
+                let isAvailable = try await self.backend.isModelAvailableLocally(model: model)
+                if isAvailable {
+                    return
+                }
+                await MainActor.run {
+                    if self.status == .idle {
+                        self.statusText = "Downloading model…"
+                    }
+                    self.log("Downloading model '\(model)'...")
+                }
+                _ = try await self.backend.ensureModelAvailable(model: model)
+                await MainActor.run {
+                    if self.status == .idle {
+                        self.statusText = "Idle"
+                    }
+                    self.log("Model '\(model)' is ready.")
+                }
+            } catch {
+                // Keep warm-up best effort; transcription path will retry and surface real errors.
+            }
+        }
+    }
+
     private func startRecording() {
         status = .recording
         statusText = "Recording…"
@@ -123,7 +153,6 @@ final class AppState: ObservableObject {
         status = .transcribing
         statusText = "Transcribing…"
         playCueIfNeeded(.recordingStop)
-        startTranscribingLoopIfNeeded()
         let model = whisperModel
         let language = whisperLanguage
         let autoPaste = autoPasteAfterTranscription
@@ -131,6 +160,30 @@ final class AppState: ObservableObject {
         Task.detached { [weak self] in
             guard let self else { return }
             do {
+                let modelIsReady: Bool
+                do {
+                    modelIsReady = try await self.backend.isModelAvailableLocally(model: model)
+                } catch {
+                    modelIsReady = true
+                }
+                if !modelIsReady {
+                    await MainActor.run {
+                        self.stopTranscribingLoopIfNeeded()
+                        self.statusText = "Downloading model…"
+                        self.log("Downloading model '\(model)'...")
+                    }
+                    _ = try await self.backend.ensureModelAvailable(model: model)
+                    await MainActor.run {
+                        self.log("Model '\(model)' is ready.")
+                    }
+                }
+
+                await MainActor.run {
+                    self.statusText = "Transcribing…"
+                    self.log("Transcribing...")
+                    self.startTranscribingLoopIfNeeded()
+                }
+
                 let result = try await self.backend.recordStop(model: model, language: language)
                 await MainActor.run {
                     self.stopTranscribingLoopIfNeeded()
@@ -193,5 +246,9 @@ final class AppState: ObservableObject {
     private func stopTranscribingLoopIfNeeded() {
         transcribingLoopSound?.stop()
         transcribingLoopSound = nil
+    }
+
+    private func log(_ message: String) {
+        print("[WhisperClip] \(message)")
     }
 }

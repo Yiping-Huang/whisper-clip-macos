@@ -75,6 +75,14 @@ echo $WHISPER_CLIP_PYTHON
 # expected: <repo>/.venv/bin/python3
 ```
 
+## First-time model download
+
+- On app launch, the currently selected model is checked and pre-downloaded if needed.
+- If you switch to a model you have never used, the app also pre-downloads it in the background.
+- During this step, status shows **Downloading model…**.
+- The transcribing loop sound is only used during actual **Transcribing…** (not during model download).
+- Download time depends on model size and network speed (for `small`, usually tens of seconds on first run).
+
 ## Permissions (macOS)
 
 - Microphone (required)
@@ -96,4 +104,4 @@ echo $WHISPER_CLIP_PYTHON
 ## Assumptions
 
 - This repo is now focused on macOS only.
-- Whisper models download to `model/` on first use.
+- Whisper models are stored in `model/` and downloaded when first selected.
