@@ -55,6 +55,8 @@ Failure:
 Implement your own LLM call in:
 
 - `backend/stt_backend/user_llm_bridge.py`
+- Optional glossary context for smart refine can be maintained in:
+  - `backend/stt_backend/user_glossary.py`
 
 Function signature:
 

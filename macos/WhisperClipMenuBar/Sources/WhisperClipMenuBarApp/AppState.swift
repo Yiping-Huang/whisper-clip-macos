@@ -157,14 +157,17 @@ final class AppState: ObservableObject {
     }
 
     private func stopRecordingAndTranscribe() {
-        status = .transcribing
-        statusText = "Transcribing…"
-        playCueIfNeeded(.recordingStop)
-        let model = whisperModel
-        let language = whisperLanguage
         let autoPaste = autoPasteAfterTranscription
         let smartRefineEnabled = self.smartRefineEnabled
         let smartMode = self.smartWorkflowMode
+        let usesGenerativeRefine = smartRefineEnabled && smartMode != .normal
+
+        status = .transcribing
+        statusText = usesGenerativeRefine ? "Transcribing + refining…" : "Transcribing…"
+        startTranscribingLoopIfNeeded()
+        playCueIfNeeded(.recordingStop)
+        let model = whisperModel
+        let language = whisperLanguage
 
         Task.detached { [weak self] in
             guard let self else { return }
@@ -177,7 +180,6 @@ final class AppState: ObservableObject {
                 }
                 if !modelIsReady {
                     await MainActor.run {
-                        self.stopTranscribingLoopIfNeeded()
                         self.statusText = "Downloading model…"
                         self.log("Downloading model '\(model)'...")
                     }
@@ -188,9 +190,8 @@ final class AppState: ObservableObject {
                 }
 
                 await MainActor.run {
-                    self.statusText = "Transcribing…"
-                    self.log("Transcribing...")
-                    self.startTranscribingLoopIfNeeded()
+                    self.statusText = usesGenerativeRefine ? "Transcribing + refining…" : "Transcribing…"
+                    self.log(usesGenerativeRefine ? "Transcribing and refining..." : "Transcribing...")
                 }
 
                 let result = try await self.backend.recordStop(

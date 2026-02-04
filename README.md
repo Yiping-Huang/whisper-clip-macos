@@ -35,6 +35,8 @@ For `Email Dictation`, `Work Chat`, and `Technical Ticket`, the backend can call
 Implement your API integration in:
 
 - `backend/stt_backend/user_llm_bridge.py`
+- Optional glossary context for repeated names/terms is in:
+  - `backend/stt_backend/user_glossary.py`
 
 Required hook contract:
 
