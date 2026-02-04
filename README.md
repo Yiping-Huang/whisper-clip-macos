@@ -28,8 +28,9 @@ The menu now includes:
   - `Normal` (keeps the current transcription-only workflow)
   - `Email Dictation` (uses email polishing prompt template)
   - `Work Chat` (uses Slack/Teams-style polishing prompt template)
+  - `Technical Ticket` (structures content for Jira/Linear/GitHub Issues)
 
-For `Email Dictation` and `Work Chat`, the backend can call your own LLM hook after transcription.
+For `Email Dictation`, `Work Chat`, and `Technical Ticket`, the backend can call your own LLM hook after transcription.
 
 Implement your API integration in:
 

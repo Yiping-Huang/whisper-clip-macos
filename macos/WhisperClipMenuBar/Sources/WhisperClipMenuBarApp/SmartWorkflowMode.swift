@@ -4,6 +4,7 @@ enum SmartWorkflowMode: String, CaseIterable {
     case normal
     case email
     case workChat = "work_chat"
+    case technicalTicket = "technical_ticket"
 
     var displayName: String {
         switch self {
@@ -13,6 +14,8 @@ enum SmartWorkflowMode: String, CaseIterable {
             return "Email Dictation"
         case .workChat:
             return "Work Chat"
+        case .technicalTicket:
+            return "Technical Ticket"
         }
     }
 }

@@ -63,7 +63,7 @@ def query_llm(user_query: str) -> str:
     ...
 ```
 
-Built-in prompt templates for `email` and `work_chat` are in:
+Built-in prompt templates for `email`, `work_chat`, and `technical_ticket` are in:
 
 - `backend/stt_backend/prompt_templates.py`
 
