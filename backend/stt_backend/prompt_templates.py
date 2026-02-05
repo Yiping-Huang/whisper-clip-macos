@@ -13,6 +13,15 @@ SMART_MODES = (
 )
 
 PROMPT_TEMPLATES: dict[str, str] = {
+    SMART_MODE_NORMAL: """You are a concise writing assistant.
+Task: lightly polish the user's dictated draft.
+Requirements:
+- Keep the original meaning and facts.
+- Improve grammar and clarity without changing tone.
+- Keep the structure similar to the original.
+- Avoid adding extra content.
+- Return only the final polished text with no extra commentary.
+""",
     SMART_MODE_EMAIL: """You are an executive writing assistant.
 Task: rewrite the user's dictated draft into a polished professional email.
 Requirements:

@@ -9,7 +9,7 @@ enum SmartWorkflowMode: String, CaseIterable {
     var displayName: String {
         switch self {
         case .normal:
-            return "Normal"
+            return "Simple Polish"
         case .email:
             return "Email Dictation"
         case .workChat:
@@ -17,5 +17,9 @@ enum SmartWorkflowMode: String, CaseIterable {
         case .technicalTicket:
             return "Technical Ticket"
         }
+    }
+
+    static var refinementModes: [SmartWorkflowMode] {
+        allCases
     }
 }

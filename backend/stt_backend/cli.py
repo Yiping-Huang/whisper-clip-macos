@@ -11,6 +11,7 @@ from .prompt_templates import SMART_MODES, SMART_MODE_NORMAL
 from .recorder import capture_loop, start_recording, stop_recording
 from .smart_workflow import refine_transcript
 from .transcriber import ensure_model_available, model_is_available_locally, transcribe_file
+from .user_llm_bridge import activate_codex, codex_status
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -49,6 +50,11 @@ def _build_parser() -> argparse.ArgumentParser:
     capture_parser.add_argument("--audio-path", type=Path, required=True)
     capture_parser.add_argument("--sample-rate", type=int, default=DEFAULT_SAMPLE_RATE)
     capture_parser.add_argument("--channels", type=int, default=1)
+
+    llm_parser = subparsers.add_parser("llm", help="LLM backend setup and status")
+    llm_mode = llm_parser.add_mutually_exclusive_group(required=True)
+    llm_mode.add_argument("--codex-status", action="store_true")
+    llm_mode.add_argument("--codex-login", action="store_true")
 
     return parser
 
@@ -181,6 +187,16 @@ def main(argv: list[str] | None = None) -> int:
                         "model_dir": str(cfg.model_dir),
                     }
                 )
+                return 0
+
+        if args.command == "llm":
+            if args.codex_status:
+                status = codex_status()
+                emit({"status": "ok", **status})
+                return 0
+            if args.codex_login:
+                status = activate_codex()
+                emit({"status": "ok", **status})
                 return 0
 
         emit({"status": "error", "error": "unsupported_command"})

@@ -17,6 +17,13 @@ final class AppState: ObservableObject {
     @Published var statusText: String = "Idle"
     @Published var lastTranscription: String = ""
     @Published var lastError: String = ""
+    @Published var llmStatusText: String = "LLM backend: not checked"
+    @Published var isLLMActionRunning: Bool = false
+    @Published var isOpenAICredentialsEditorVisible: Bool = false
+    @Published var openAIApiKeyDraft: String = ""
+    @Published var openAIModelDraft: String = "gpt-4o-mini"
+    @Published var isCodexInstalled: Bool = false
+    @Published var isCodexAuthenticated: Bool = false
 
     @AppStorage("autoPasteAfterTranscription") var autoPasteAfterTranscription: Bool = false
     @AppStorage("whisperModel") var whisperModel: String = "small"
@@ -24,7 +31,10 @@ final class AppState: ObservableObject {
     @AppStorage("soundCuesEnabled") var soundCuesEnabled: Bool = true
     @AppStorage("transcribingLoopSoundEnabled") var transcribingLoopSoundEnabled: Bool = true
     @AppStorage("smartRefineEnabled") var smartRefineEnabled: Bool = false
-    @AppStorage("smartWorkflowMode") private var smartWorkflowModeRawValue: String = SmartWorkflowMode.normal.rawValue
+    @AppStorage("smartWorkflowMode") private var smartWorkflowModeRawValue: String = SmartWorkflowMode.email.rawValue
+    @AppStorage("llmBackendProvider") private var llmBackendProviderRawValue: String = LLMBackendProvider.codexCLI.rawValue
+    @AppStorage("openAIApiKey") var openAIApiKey: String = ""
+    @AppStorage("openAIModel") var openAIModel: String = "gpt-4o-mini"
 
     // Carbon global hotkeys do not support Fn as a modifier, so we use Option+Z.
     private let hotKeyCode: UInt32 = UInt32(kVK_ANSI_Z)
@@ -48,6 +58,8 @@ final class AppState: ObservableObject {
         hotKeyManager?.register()
         NotificationClient.shared.requestAuthorization()
         warmUpModelIfNeeded(whisperModel)
+        normalizeSmartWorkflowModeIfNeeded()
+        refreshLLMStatus()
     }
 
     var statusIconName: String {
@@ -74,6 +86,18 @@ final class AppState: ObservableObject {
     var smartWorkflowMode: SmartWorkflowMode {
         get { SmartWorkflowMode(rawValue: smartWorkflowModeRawValue) ?? .normal }
         set { smartWorkflowModeRawValue = newValue.rawValue }
+    }
+
+    var canRunCodexLogin: Bool {
+        llmBackendProvider == .codexCLI && isCodexInstalled && !isLLMActionRunning
+    }
+
+    var llmBackendProvider: LLMBackendProvider {
+        get { LLMBackendProvider(rawValue: llmBackendProviderRawValue) ?? .codexCLI }
+        set {
+            llmBackendProviderRawValue = newValue.rawValue
+            refreshLLMStatus()
+        }
     }
 
     func toggleRecording() {
@@ -168,6 +192,9 @@ final class AppState: ObservableObject {
         playCueIfNeeded(.recordingStop)
         let model = whisperModel
         let language = whisperLanguage
+        let llmProvider = self.llmBackendProvider
+        let openAIApiKey = self.openAIApiKey
+        let openAIModel = self.openAIModel
 
         Task.detached { [weak self] in
             guard let self else { return }
@@ -198,7 +225,10 @@ final class AppState: ObservableObject {
                     model: model,
                     language: language,
                     smartRefineEnabled: smartRefineEnabled,
-                    smartWorkflowMode: smartMode
+                    smartWorkflowMode: smartMode,
+                    llmProvider: llmProvider,
+                    openAIApiKey: openAIApiKey,
+                    openAIModel: openAIModel
                 )
                 await MainActor.run {
                     self.stopTranscribingLoopIfNeeded()
@@ -265,5 +295,108 @@ final class AppState: ObservableObject {
 
     private func log(_ message: String) {
         print("[WhisperClip] \(message)")
+    }
+
+    func runLLMProviderAction() {
+        switch llmBackendProvider {
+        case .codexCLI:
+            runCodexLogin()
+        case .openAIAPI:
+            startOpenAICredentialsEditing()
+        case .azureOpenAI:
+            break
+        }
+    }
+
+    func startOpenAICredentialsEditing() {
+        openAIApiKeyDraft = openAIApiKey
+        openAIModelDraft = openAIModel
+        isOpenAICredentialsEditorVisible = true
+    }
+
+    func cancelOpenAICredentialsEditing() {
+        isOpenAICredentialsEditorVisible = false
+    }
+
+    func commitOpenAICredentialsEditing() {
+        saveOpenAICredentials(apiKey: openAIApiKeyDraft, model: openAIModelDraft)
+        isOpenAICredentialsEditorVisible = false
+    }
+
+    func saveOpenAICredentials(apiKey: String, model: String) {
+        openAIApiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        openAIModel = trimmedModel.isEmpty ? "gpt-4o-mini" : trimmedModel
+        refreshLLMStatus()
+    }
+
+    func refreshLLMStatus() {
+        switch llmBackendProvider {
+        case .codexCLI:
+            llmStatusText = "LLM backend: checking Codex CLI..."
+            Task.detached { [weak self] in
+                guard let self else { return }
+                do {
+                    let status = try await self.backend.codexStatus()
+                    await MainActor.run {
+                        self.isCodexInstalled = status.installed
+                        self.isCodexAuthenticated = status.authenticated
+                        self.llmStatusText = "LLM backend: \(status.message)"
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.isCodexInstalled = false
+                        self.isCodexAuthenticated = false
+                        self.llmStatusText = "LLM backend: Codex check failed (\(error.localizedDescription))"
+                    }
+                }
+            }
+        case .openAIAPI:
+            isCodexInstalled = false
+            isCodexAuthenticated = false
+            if openAIApiKey.isEmpty {
+                llmStatusText = "LLM backend: OpenAI API selected (credentials missing)"
+            } else {
+                llmStatusText = "LLM backend: OpenAI API active (model: \(openAIModel))"
+            }
+        case .azureOpenAI:
+            isCodexInstalled = false
+            isCodexAuthenticated = false
+            llmStatusText = "LLM backend: Azure OpenAI selected (placeholder; edit user_llm_bridge.py)"
+        }
+    }
+
+    private func runCodexLogin() {
+        guard isCodexInstalled else {
+            llmStatusText = "LLM backend: Codex CLI is not installed. Install with 'brew install codex' first."
+            return
+        }
+        guard !isLLMActionRunning else { return }
+        isLLMActionRunning = true
+        llmStatusText = "LLM backend: preparing Codex CLI..."
+
+        Task.detached { [weak self] in
+            guard let self else { return }
+            do {
+                let status = try await self.backend.codexLogin()
+                await MainActor.run {
+                    self.isLLMActionRunning = false
+                    self.isCodexInstalled = status.installed
+                    self.isCodexAuthenticated = status.authenticated
+                    self.llmStatusText = "LLM backend: \(status.message)"
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLLMActionRunning = false
+                    self.llmStatusText = "LLM backend: Codex login failed (\(error.localizedDescription))"
+                }
+            }
+        }
+    }
+
+    private func normalizeSmartWorkflowModeIfNeeded() {
+        if smartWorkflowMode == .normal {
+            smartWorkflowMode = .email
+        }
     }
 }

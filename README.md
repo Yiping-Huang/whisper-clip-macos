@@ -25,12 +25,23 @@ Whisper Clip is a local speech-to-text menu bar app for macOS.
 The menu now includes:
 - `Smart refine (LLM)` toggle
 - `Smart mode` picker with:
-  - `Normal` (keeps the current transcription-only workflow)
   - `Email Dictation` (uses email polishing prompt template)
   - `Work Chat` (uses Slack/Teams-style polishing prompt template)
   - `Technical Ticket` (structures content for Jira/Linear/GitHub Issues)
 
-For `Email Dictation`, `Work Chat`, and `Technical Ticket`, the backend can call your own LLM hook after transcription.
+For these smart modes, the backend can call your selected AI backend after transcription.
+
+## AI backend options
+
+The `AI Backend` picker supports:
+- `Pure Chat Mode (Codex CLI)`
+- `OpenAI API (ChatGPT)`
+- `Azure OpenAI (Placeholder)`
+
+Codex setup:
+- Install Codex CLI manually: `brew install codex`
+- Then click `Codex Login` in the app to authenticate
+- If Codex is not installed, the `Codex Login` button is intentionally disabled
 
 Implement your API integration in:
 

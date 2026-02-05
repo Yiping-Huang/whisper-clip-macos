@@ -8,6 +8,12 @@ struct TranscriptionResult {
     let workflowMode: SmartWorkflowMode
 }
 
+struct CodexBackendStatus {
+    let installed: Bool
+    let authenticated: Bool
+    let message: String
+}
+
 enum BackendError: LocalizedError {
     case executableNotFound(String)
     case commandFailed(String)
@@ -52,7 +58,10 @@ final class BackendClient {
         model: String,
         language: String,
         smartRefineEnabled: Bool,
-        smartWorkflowMode: SmartWorkflowMode
+        smartWorkflowMode: SmartWorkflowMode,
+        llmProvider: LLMBackendProvider,
+        openAIApiKey: String,
+        openAIModel: String
     ) async throws -> TranscriptionResult {
         let payload = try await runBackend(args: [
             "record", "--stop",
@@ -61,6 +70,10 @@ final class BackendClient {
             "--language", language,
             "--smart-mode", smartWorkflowMode.rawValue,
             "--smart-refine-enabled", smartRefineEnabled ? "true" : "false",
+        ], extraEnv: [
+            "WHISPER_CLIP_LLM_PROVIDER": llmProvider.rawValue,
+            "WHISPER_CLIP_OPENAI_API_KEY": openAIApiKey,
+            "WHISPER_CLIP_OPENAI_MODEL": openAIModel,
         ])
         if (payload["status"] as? String) != "ok" {
             throw BackendError.commandFailed(payload["error"] as? String ?? "record stop failed")
@@ -77,6 +90,30 @@ final class BackendClient {
             modelDownloaded: modelDownloaded,
             refined: refined,
             workflowMode: workflowMode
+        )
+    }
+
+    func codexStatus() async throws -> CodexBackendStatus {
+        let payload = try await runBackend(args: ["llm", "--codex-status"])
+        if (payload["status"] as? String) != "ok" {
+            throw BackendError.commandFailed(payload["error"] as? String ?? "codex status failed")
+        }
+        return CodexBackendStatus(
+            installed: payload["installed"] as? Bool ?? false,
+            authenticated: payload["authenticated"] as? Bool ?? false,
+            message: payload["message"] as? String ?? "Unknown Codex status"
+        )
+    }
+
+    func codexLogin() async throws -> CodexBackendStatus {
+        let payload = try await runBackend(args: ["llm", "--codex-login"])
+        if (payload["status"] as? String) != "ok" {
+            throw BackendError.commandFailed(payload["error"] as? String ?? "codex login failed")
+        }
+        return CodexBackendStatus(
+            installed: payload["installed"] as? Bool ?? false,
+            authenticated: payload["authenticated"] as? Bool ?? false,
+            message: payload["message"] as? String ?? "Codex login finished"
         )
     }
 
@@ -102,7 +139,7 @@ final class BackendClient {
         return payload["downloaded"] as? Bool ?? false
     }
 
-    private func runBackend(args: [String]) async throws -> [String: Any] {
+    private func runBackend(args: [String], extraEnv: [String: String] = [:]) async throws -> [String: Any] {
         let pythonPath = resolvePythonExecutable()
         guard fileManager.fileExists(atPath: pythonPath) else {
             throw BackendError.executableNotFound(pythonPath)
@@ -114,6 +151,9 @@ final class BackendClient {
 
         var env = ProcessInfo.processInfo.environment
         env["PYTHONPATH"] = backendPythonPath()
+        for (key, value) in extraEnv {
+            env[key] = value
+        }
         process.environment = env
 
         let stdoutPipe = Pipe()

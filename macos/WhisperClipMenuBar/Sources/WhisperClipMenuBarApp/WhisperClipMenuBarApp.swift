@@ -15,6 +15,9 @@ struct WhisperClipMenuBarApp: App {
                 Text(appState.notificationStatusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text(appState.llmStatusText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Button(appState.status == .recording ? "Stop Recording" : "Start Recording") {
                     appState.toggleRecording()
@@ -26,11 +29,41 @@ struct WhisperClipMenuBarApp: App {
                 Toggle("Sound cues", isOn: $appState.soundCuesEnabled)
                 Toggle("Transcribing loop sound", isOn: $appState.transcribingLoopSoundEnabled)
                 Toggle("Smart refine (LLM)", isOn: $appState.smartRefineEnabled)
+                Picker("AI Backend", selection: Binding(
+                    get: { appState.llmBackendProvider },
+                    set: { appState.llmBackendProvider = $0 }
+                )) {
+                    ForEach(LLMBackendProvider.allCases, id: \.rawValue) { provider in
+                        Text(provider.displayName).tag(provider)
+                    }
+                }
+                if let actionTitle = appState.llmBackendProvider.actionButtonTitle {
+                    Button(actionTitle) {
+                        appState.runLLMProviderAction()
+                    }
+                    .disabled(appState.llmBackendProvider == .codexCLI ? !appState.canRunCodexLogin : appState.isLLMActionRunning)
+                }
+                if appState.llmBackendProvider == .openAIAPI && appState.isOpenAICredentialsEditorVisible {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SecureField("API Key", text: $appState.openAIApiKeyDraft)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Model", text: $appState.openAIModelDraft)
+                            .textFieldStyle(.roundedBorder)
+                        HStack {
+                            Button("Cancel") {
+                                appState.cancelOpenAICredentialsEditing()
+                            }
+                            Button("Save") {
+                                appState.commitOpenAICredentialsEditing()
+                            }
+                        }
+                    }
+                }
                 Picker("Smart mode", selection: Binding(
                     get: { appState.smartWorkflowMode },
                     set: { appState.smartWorkflowMode = $0 }
                 )) {
-                    ForEach(SmartWorkflowMode.allCases, id: \.rawValue) { mode in
+                    ForEach(SmartWorkflowMode.refinementModes, id: \.rawValue) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
